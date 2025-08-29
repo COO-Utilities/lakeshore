@@ -13,7 +13,7 @@ Low-level Python modules to send commands to Lakeshore 224 or 336 controllers.
 ## Usage
 
 ```python
-from hispec.util import lakeshore
+import lakeshore
 
 controller = lakeshore.LakeshoreController()    # defaults to 336
 controller.set_connection(ip='192.168.29.104', port=7777)

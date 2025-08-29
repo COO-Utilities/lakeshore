@@ -6,8 +6,7 @@ import logging
 import socket
 import threading
 import time
-
-from hispec.util.helper import logger_utils
+import sys
 
 
 class LakeshoreController:
@@ -31,8 +30,7 @@ class LakeshoreController:
     htr_display = {'1': 'current', '2': 'power'}
     htr_errors = {'0': 'no error', '1': 'heater open load', '2': 'heater short'}
 
-    def __init__(self, log=True, logfile=None, quiet=False, opt3062=False,
-                 model336=True):
+    def __init__(self, log=True, logfile=None, opt3062=False, model336=True):
 
         self.lock = threading.Lock()
         self.socket = None
@@ -44,9 +42,20 @@ class LakeshoreController:
         if log:
             if logfile is None:
                 logfile = __name__.rsplit(".", 1)[-1] + ".log"
-            self.logger = logger_utils.setup_logger(__name__, log_file=logfile)
-            if quiet:
-                self.logger.setLevel(logging.INFO)
+            self.logger = logging.getLogger(logfile)
+            self.logger.setLevel(logging.INFO)
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            file_handler = logging.FileHandler(logfile)
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
+
+            console_formatter = logging.Formatter(
+                '%(asctime)s--%(message)s')
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setFormatter(console_formatter)
+            self.logger.addHandler(console_handler)
         else:
             self.logger = None
 
@@ -176,6 +185,14 @@ class LakeshoreController:
         if current != 'locked' or status == 'unlocked':
             self.status = status
 
+    def set_verbose(self, verbose: bool =True) -> None:
+        """Set verbose mode."""
+
+        if self.logger:
+            if verbose:
+                self.logger.setLevel(logging.DEBUG)
+            else:
+                self.logger.setLevel(logging.INFO)
 
     def initialize(self, celsius=True):
         """ Initialize the lakeshore status. """

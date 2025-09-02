@@ -17,12 +17,6 @@ def main(config_file):
 
     verbose = cfg['verbose'] == 1
 
-    ## Connect to InfluxDB
-    if verbose:
-        print("Connecting to InfluxDB...")
-    db_client = InfluxDBClient(url=cfg['db_url'], token=cfg['db_token'], org=cfg['db_org'])
-    write_api = db_client.write_api(write_options=SYNCHRONOUS)
-
     ## Connect to Lakeshore
     if verbose:
         print("Connecting to Lakeshore...")
@@ -30,6 +24,12 @@ def main(config_file):
     lake.set_connection(cfg['device_host'], cfg['device_port'])
     lake.connect()
     lake.initialize()
+
+    ## Connect to InfluxDB
+    if verbose:
+        print("Connecting to InfluxDB...")
+    db_client = InfluxDBClient(url=cfg['db_url'], token=cfg['db_token'], org=cfg['db_org'])
+    write_api = db_client.write_api(write_options=SYNCHRONOUS)
 
     try:
         channels = cfg['log_channels']

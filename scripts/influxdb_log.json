@@ -1,0 +1,17 @@
+{
+  "db_url": "localhost:8086",
+  "db_token": "",
+  "db_org": "Organization",
+  "db_bucket": "bucket",
+  "db_channel": "Temperature",
+  "log_channels": {
+    "A": {"field":  "temperature",
+        "units": "degC"},
+    "1": {"field": "output",
+        "units":  "Perc"}
+  },
+  "device_host": "lakeshore",
+  "device_port": 7777,
+  "interval_secs": 30,
+  "verbose": 0
+}

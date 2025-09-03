@@ -6,18 +6,17 @@ from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 import lakeshore
 
-# cfg_file = files('scripts'), 'influxdb_config.json')
 
 def main(config_file):
     """Query user for setup info and start logging to InfluxDB."""
 
-    ## read config file
+    # read the config file
     with open(config_file, encoding='utf-8') as cfg_file:
         cfg = json.load(cfg_file)
 
     verbose = cfg['verbose'] == 1
 
-    ## Connect to Lakeshore
+    # Connect to Lakeshore
     if verbose:
         print("Connecting to Lakeshore...")
     lake = lakeshore.LakeshoreController()
@@ -25,7 +24,7 @@ def main(config_file):
     lake.connect()
     lake.initialize()
 
-    ## Connect to InfluxDB
+    # Connect to InfluxDB
     if verbose:
         print("Connecting to InfluxDB...")
     db_client = InfluxDBClient(url=cfg['db_url'], token=cfg['db_token'], org=cfg['db_org'])
@@ -59,6 +58,7 @@ def main(config_file):
         print("\nShutting down InfluxDB logging...")
         db_client.close()
         lake.disconnect()
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

@@ -77,7 +77,7 @@ class LakeshoreController:
             }
         else:
             # Model 224
-            self.sensors = {'A':1, 'B':2,
+            self.sensors = {'A': 1, 'B': 2,
                             'C1': 3, 'C2': 4, 'C3': 5, 'C4': 6, 'C5': 7,
                             'D1': 8, 'D2': 9, 'D3': 10, 'D4': 11, 'D5': 12}
             self.outputs = None
@@ -167,7 +167,6 @@ class LakeshoreController:
 
         self.set_status(status)
 
-
     def set_status(self, status):
         """ Set the status of the filter wheel.
 
@@ -185,7 +184,7 @@ class LakeshoreController:
         if current != 'locked' or status == 'unlocked':
             self.status = status
 
-    def set_verbose(self, verbose: bool =True) -> None:
+    def set_verbose(self, verbose: bool = True) -> None:
         """Set verbose mode."""
 
         if self.logger:
@@ -231,7 +230,6 @@ class LakeshoreController:
             self.set_kelvin()
 
         self.initialized = True
-
 
     def command(self, command, params=None):
         """ Wrapper to issue_command(), ensuring the command lock is

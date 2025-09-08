@@ -13,5 +13,6 @@
   "device_host": "lakeshore",
   "device_port": 7777,
   "interval_secs": 30,
-  "verbose": 0
+  "verbose": 0,
+  "logfile": ""
 }

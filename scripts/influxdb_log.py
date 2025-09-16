@@ -72,7 +72,7 @@ def main(config_file):
                         print(f"ERROR: Unknown channel {chan}")
                         sys.exit(1)
                     point = (
-                        Point("Lakeshore")
+                        Point("lakeshore")
                         .field(channels[chan]['field'], value)
                         .tag("units", channels[chan]['units'])
                         .tag("channel", f"{cfg['db_channel']}")

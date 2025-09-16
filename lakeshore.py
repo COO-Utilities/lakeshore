@@ -100,7 +100,7 @@ class LakeshoreController:
             self.socket.close()
             self.socket = None
             if self.logger:
-                self.logger.debug("Disconnected controller")
+                self.logger.info("Disconnected controller")
             self.connected = False
             self.success = True
 
@@ -120,7 +120,7 @@ class LakeshoreController:
         try:
             self.socket.connect((self.ip, self.port))
             if self.logger:
-                self.logger.debug("Connected to %(host)s:%(port)s", {
+                self.logger.info("Connected to %(host)s:%(port)s", {
                     'host': self.ip,
                     'port': self.port
                 })

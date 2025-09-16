@@ -65,6 +65,10 @@ def main(config_file):
                 # Loop over channels to log
                 for chan in channels:
                     if chan in lake.sensors:
+                        if 'K' in channels[chan]['units']:
+                            lake.set_kelvin()
+                        else:
+                            lake.set_celsius()
                         value = lake.get_temperature(chan)
                     elif chan in lake.outputs:
                         value = lake.get_heater_output(chan)

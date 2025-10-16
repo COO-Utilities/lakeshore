@@ -397,4 +397,20 @@ class LakeshoreController(HardwareDeviceBase):
         else:
             self.logger.error("Heater is not available with this model")
         return retval
+
+    def get_atomic_value(self, item: str = "") -> Union[float, None]:
+        """
+        Read the latest value of a specific item
+        :param item: String, name of the item
+        returns value of item
+        """
+        retval = None
+        if item not in self.sensors or item not in self.outputs:
+            self.logger.error("Item %s is not available", item)
+        else:
+            if item in self.sensors:
+                retval = self.get_temperature(item)
+            else:
+                retval = self.get_heater_output(item)
+        return retval
 # end of class Controller

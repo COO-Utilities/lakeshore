@@ -84,7 +84,7 @@ class LakeshoreController(HardwareDeviceBase):
 
     def connect(self, *args, con_type: str ="tcp") -> None:
         """ Connect to controller. """
-        if self.validate_connection_params(*args):
+        if self.validate_connection_params(args):
             if con_type == "tcp":
                 self.host = args[0]
                 self.port = args[1]

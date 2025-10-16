@@ -402,11 +402,11 @@ class LakeshoreController(HardwareDeviceBase):
         """
         Read the latest value of a specific item
         :param item: String, name of the item
-        returns value of item
+        returns value of item or None
         """
         retval = None
-        if item in self.sensors or item in self.outputs:
-            if item in self.sensors:
+        if item.upper() in self.sensors or item in self.outputs:
+            if item.upper() in self.sensors:
                 retval = self.get_temperature(item)
             else:
                 retval = self.get_heater_output(item)

@@ -27,7 +27,13 @@ class LakeshoreController(HardwareDeviceBase):
 
     def __init__(self, log=True, logfile=__name__.rsplit(".", 1)[-1],
                  opt3062=False, model336=True):
-        """ Initialize the Lakeshore controller."""
+        """ Initialize the Lakeshore controller.
+        :param log: If True, log to file
+        :param logfile: name of log file (defaults to lakeshore.log)
+        :param opt3062: set to True if optional 3062 board installed (defaults to False)
+        :param model336: set to True if controller is model 336 (default),
+                        if False assumes model 224
+        """
 
         super().__init__(log, logfile)
         self.socket: socket.socket | None = None
@@ -112,7 +118,7 @@ class LakeshoreController(HardwareDeviceBase):
                         self.success = False
                         self.set_status('not connected')
                 # clear socket
-                if self.connected:
+                if self.is_connected():
                     self._clear_socket()
             elif con_type == "serial":
                 self.logger.error("Serial connection not supported")
@@ -134,7 +140,7 @@ class LakeshoreController(HardwareDeviceBase):
 
     def check_status(self):
         """ Check connection status """
-        if not self.connected:
+        if not self.is_connected():
             status = 'not connected'
         elif not self.success:
             status = 'unresponsive'
@@ -224,7 +230,7 @@ class LakeshoreController(HardwareDeviceBase):
         :param args: String, parameters to issue.
 
         """
-        if not self.connected:
+        if not self.is_connected():
             self.set_status('connecting')
             self.connect(self.host, self.port)
 

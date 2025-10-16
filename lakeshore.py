@@ -230,7 +230,7 @@ class LakeshoreController(HardwareDeviceBase):
 
         retries = 3
         if args:
-            send_command = f"{command} {args}{self.termchars}".encode('utf-8')
+            send_command = f"{command} {args[0]}{self.termchars}".encode('utf-8')
         else:
             send_command = f"{command}{self.termchars}".encode('utf-8')
 

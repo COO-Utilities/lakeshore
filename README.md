@@ -16,8 +16,7 @@ Low-level Python modules to send commands to Lakeshore 224 or 336 controllers.
 import lakeshore
 
 controller = lakeshore.LakeshoreController()    # defaults to 336
-controller.set_connection(ip='192.168.29.104', port=7777)
-controller.connect()
+controller.connect('192.168.29.104', 7777)
 
 # Initialize controller
 controller.initialize(celsius=False)    # print temperatures in Kelvin

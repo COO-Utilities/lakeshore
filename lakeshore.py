@@ -2,22 +2,17 @@
 """ Lakeshore 224/336 controller class """
 
 from errno import ETIMEDOUT, EISCONN
-import logging
 import socket
-import threading
 import time
-import sys
+from typing import Union
+
+from hardware_device_base import HardwareDeviceBase
 
 
-class LakeshoreController:
+class LakeshoreController(HardwareDeviceBase):
     """ Handle all correspondence with the ethernet interface of the
         Lakeshore 224/336 controller.
     """
-
-    connected = False
-    status = None
-    ip = ''
-    port = 0
 
     initialized = False
     revision = None
@@ -30,34 +25,25 @@ class LakeshoreController:
     htr_display = {'1': 'current', '2': 'power'}
     htr_errors = {'0': 'no error', '1': 'heater open load', '2': 'heater short'}
 
-    def __init__(self, log=True, logfile=None, opt3062=False, model336=True):
+    def __init__(self, log=True, logfile=__name__.rsplit(".", 1)[-1],
+                 opt3062=False, model336=True):
+        """ Initialize the Lakeshore controller.
+        :param log: If True, log to file
+        :param logfile: name of log file (defaults to lakeshore.log)
+        :param opt3062: set to True if optional 3062 board installed (defaults to False)
+        :param model336: set to True if controller is model 336 (default),
+                        if False assumes model 224
+        """
 
-        self.lock = threading.Lock()
-        self.socket = None
+        super().__init__(log, logfile)
+        self.socket: socket.socket | None = None
+        self.host: str | None = None
+        self.port: int = -1
 
         self.celsius = True
         self.model336 = model336
 
-        # set up logging
-        if log:
-            if logfile is None:
-                logfile = __name__.rsplit(".", 1)[-1] + ".log"
-            self.logger = logging.getLogger(logfile)
-            self.logger.setLevel(logging.INFO)
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
-            file_handler = logging.FileHandler(logfile)
-            file_handler.setFormatter(formatter)
-            self.logger.addHandler(file_handler)
-
-            console_formatter = logging.Formatter(
-                '%(asctime)s--%(message)s')
-            console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setFormatter(console_formatter)
-            self.logger.addHandler(console_handler)
-        else:
-            self.logger = None
+        self.status = None
 
         if model336:
             if opt3062:
@@ -82,70 +68,66 @@ class LakeshoreController:
                             'D1': 8, 'D2': 9, 'D3': 10, 'D4': 11, 'D5': 12}
             self.outputs = None
 
-    def set_connection(self, ip=None, port=None):
-        """ Configure the connection to the controller.
-
-        :param ip: String, IP address of the controller.
-        :param port: Int, port number of the controller.
-
-        """
-        self.ip = ip
-        self.port = port
-
-    def disconnect(self):
+    def disconnect(self) -> None:
         """ Disconnect controller. """
 
         try:
             self.socket.shutdown(socket.SHUT_RDWR)
             self.socket.close()
             self.socket = None
-            if self.logger:
-                self.logger.info("Disconnected controller")
-            self.connected = False
+            self.logger.info("Disconnected controller")
+            self._set_connected(False)
             self.success = True
 
         except OSError as e:
             if self.logger:
                 self.logger.error("Disconnection error: %s", e.strerror)
-            self.connected = False
+            self._set_connected(False)
             self.socket = None
             self.success = False
 
         self.set_status("disconnected")
 
-    def connect(self):
+    def connect(self, *args, con_type: str ="tcp") -> None:
         """ Connect to controller. """
-        if self.socket is None:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            self.socket.connect((self.ip, self.port))
-            if self.logger:
-                self.logger.info("Connected to %(host)s:%(port)s", {
-                    'host': self.ip,
-                    'port': self.port
-                })
-            self.connected = True
-            self.success = True
-            self.set_status('ready')
+        if self.validate_connection_params(args):
+            if con_type == "tcp":
+                self.host = args[0]
+                self.port = args[1]
+                if self.socket is None:
+                    self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                try:
+                    self.socket.connect((self.host, self.port))
+                    self.logger.info("Connected to %(host)s:%(port)s", {
+                            'host': self.host,
+                            'port': self.port
+                        })
+                    self._set_connected(True)
+                    self.success = True
+                    self.set_status('ready')
 
-        except OSError as e:
-            if e.errno == EISCONN:
-                if self.logger:
-                    self.logger.debug("Already connected")
-                self.connected = True
-                self.success = True
-                self.set_status('ready')
-            else:
-                if self.logger:
-                    self.logger.error("Connection error: %s", e.strerror)
-                self.connected = False
-                self.success = False
-                self.set_status('not connected')
-        # clear socket
-        if self.connected:
-            self.__clear_socket()
+                except OSError as e:
+                    if e.errno == EISCONN:
+                        self.logger.debug("Already connected")
+                        self._set_connected(True)
+                        self.success = True
+                        self.set_status('ready')
+                    else:
+                        self.logger.error("Connection error: %s", e.strerror)
+                        self._set_connected(False)
+                        self.success = False
+                        self.set_status('not connected')
+                # clear socket
+                if self.is_connected():
+                    self._clear_socket()
+            elif con_type == "serial":
+                self.logger.error("Serial connection not supported")
+                self._set_connected(False)
+        else:
+            self.logger.error("Invalid connection parameters: %s", args)
+            self._set_connected(False)
 
-    def __clear_socket(self):
+    def _clear_socket(self):
         """ Clear socket buffer. """
         if self.socket is not None:
             self.socket.setblocking(False)
@@ -158,7 +140,7 @@ class LakeshoreController:
 
     def check_status(self):
         """ Check connection status """
-        if not self.connected:
+        if not self.is_connected():
             status = 'not connected'
         elif not self.success:
             status = 'unresponsive'
@@ -173,7 +155,6 @@ class LakeshoreController:
         :param status: String, status of the controller.
 
         """
-
         status = status.lower()
 
         if self.status is None:
@@ -184,15 +165,6 @@ class LakeshoreController:
         if current != 'locked' or status == 'unlocked':
             self.status = status
 
-    def set_verbose(self, verbose: bool = True) -> None:
-        """Set verbose mode."""
-
-        if self.logger:
-            if verbose:
-                self.logger.setLevel(logging.DEBUG)
-            else:
-                self.logger.setLevel(logging.INFO)
-
     def initialize(self, celsius=True):
         """ Initialize the lakeshore status. """
 
@@ -200,11 +172,11 @@ class LakeshoreController:
 
         if self.model336:
 
-            for htr in self.outputs.keys():
+            for htr_items in self.outputs.items():
+                htr = htr_items[0]
                 htr_settings = self.get_heater_settings(htr)
                 if htr_settings is None:
-                    if self.logger:
-                        self.logger.warning("Unable to get settings for htr %s", htr)
+                    self.logger.warning("Unable to get settings for htr %s", htr)
                 else:
                     resistance, max_current, user_max_current, htr_display = htr_settings
                     self.outputs[htr]['resistance'] = resistance
@@ -216,8 +188,7 @@ class LakeshoreController:
 
                 pid = self.get_heater_pid(htr)
                 if pid is None:
-                    if self.logger:
-                        self.logger.warning("PID not set for htr %s", htr)
+                    self.logger.warning("PID not set for htr %s", htr)
                 else:
                     p, i, d = pid
                     self.outputs[htr]['p'] = p
@@ -242,87 +213,82 @@ class LakeshoreController:
 
         with self.lock:
             try:
-                result = self.issue_command(command, params)
-                self.success = True
+                self.success= self._send_command(command, params)
+                result = ''
+                if '?' in command:
+                    result = self._read_reply()
             finally:
                 # Ensure that status is always checked, even on failure
                 self.check_status()
 
         return result
 
-    def issue_command(self, command, params=None):
+    def _send_command(self, command, *args) -> bool:
         """ Wrapper to send/receive with error checking and retries.
 
         :param command: String, command to issue.
-        :param params: String, parameters to issue.
+        :param args: String, parameters to issue.
 
         """
-
-        if not self.connected:
+        if not self.is_connected():
             self.set_status('connecting')
-            self.connect()
+            self.connect(self.host, self.port)
 
         retries = 3
-        reply = ''
-        if params:
-            send_command = f"{command} {params}{self.termchars}".encode('utf-8')
+        if args:
+            send_command = f"{command} {args[0]}{self.termchars}".encode('utf-8')
         else:
             send_command = f"{command}{self.termchars}".encode('utf-8')
 
         while retries > 0:
-            if self.logger:
-                self.logger.debug("sending command %s", send_command)
+            self.logger.debug("sending command %s", send_command)
             try:
                 self.socket.send(send_command)
 
             except socket.error:
-                if self.logger:
-                    self.logger.error(
+                self.logger.error(
                         "Failed to send command, re-opening socket, %d retries"
                         " remaining", retries)
                 self.disconnect()
                 try:
-                    self.connect()
+                    self.connect(self.host, self.port)
                 except OSError:
-                    if self.logger:
-                        self.logger.error(
-                            'Could not reconnect to controller, aborting')
-                    return None
+                    self.logger.error('Could not reconnect to controller, aborting')
+                    return False
                 retries -= 1
                 continue
-
-            # Get a reply, if needed.
-            if command[-1] == '?':
-                timeout = 1
-                start = time.time()
-                reply = self.socket.recv(1024)
-                while self.termchars not in reply.decode('utf-8') and \
-                        time.time() - start < timeout:
-                    try:
-                        reply += self.socket.recv(1024)
-                        if self.logger:
-                            self.logger.debug("reply: %s", reply)
-                    except OSError as e:
-                        if e.errno == ETIMEDOUT:
-                            reply = ''
-                    time.sleep(0.1)
-
-                if reply == '':
-                    # Don't log here, because it happens a lot when the controller
-                    # is unresponsive. Just try again.
-                    retries -= 1
-                    continue
-                break
             break
+        if retries <= 0:
+            self.logger.error("Failed to send command.")
+            raise RuntimeError('unable to successfully issue command: ' + repr(command))
+
+        self.logger.debug("Sent command: %s", send_command)
+        return True
+
+    def _read_reply(self) -> Union[str, None]:
+        # Get a reply, if needed.
+        timeout = 1
+        start = time.time()
+        reply = self.socket.recv(1024)
+        while self.termchars not in reply.decode('utf-8') and \
+                time.time() - start < timeout:
+            try:
+                reply += self.socket.recv(1024)
+                self.logger.debug("reply: %s", reply)
+            except OSError as e:
+                if e.errno == ETIMEDOUT:
+                    reply = ''
+            time.sleep(0.1)
+
+            if reply == '':
+                # Don't log here, because it happens a lot when the controller
+                # is unresponsive. Just try again.
+                continue
 
         if isinstance(reply, str):
             reply = reply.strip()
         else:
             reply = reply.decode('utf-8').strip()
-
-        if retries == 0:
-            raise RuntimeError('unable to successfully issue command: ' + repr(command))
-
         return reply
 
     def set_celsius(self):
@@ -341,8 +307,7 @@ class LakeshoreController:
         """
         retval = None
         if sensor.upper() not in self.sensors:
-            if self.logger:
-                self.logger.error("Sensor %s is not available", sensor)
+            self.logger.error("Sensor %s is not available", sensor)
         else:
             if self.celsius:
                 reply = self.command('crdg?', sensor)
@@ -363,8 +328,7 @@ class LakeshoreController:
         retval = None
         if self.model336:
             if output.upper() not in self.outputs:
-                if self.logger:
-                    self.logger.error("Heater %s is not available", output)
+                self.logger.error("Heater %s is not available", output)
             else:
                 reply = self.command('htrset?', output)
                 if len(reply) > 0:
@@ -372,8 +336,7 @@ class LakeshoreController:
                     retval = (self.resistance[ires], self.max_current[imaxcur],
                               float(strusermaxcur), self.htr_display[idisp])
         else:
-            if self.logger:
-                self.logger.error("Heater is not available with this model")
+            self.logger.error("Heater is not available with this model")
         return retval
 
     def get_heater_pid(self, output):
@@ -385,16 +348,14 @@ class LakeshoreController:
         retval = None
         if self.model336:
             if output.upper() not in self.outputs:
-                if self.logger:
-                    self.logger.error("Heater %s is not available", output)
+                self.logger.error("Heater %s is not available", output)
             else:
                 reply = self.command('pid?', output)
                 if len(reply) > 0:
                     p, i, d = reply.split(',')
                     retval = [float(i), float(d), float(p)]
         else:
-            if self.logger:
-                self.logger.error("Heater is not available with this model")
+            self.logger.error("Heater is not available with this model")
         return retval
 
     def get_heater_status(self, output):
@@ -406,8 +367,7 @@ class LakeshoreController:
         retval = 'unknown'
         if self.model336:
             if output.upper() not in self.outputs:
-                if self.logger:
-                    self.logger.error("Heater %s is not available", output)
+                self.logger.error("Heater %s is not available", output)
             else:
                 reply = self.command('htrst?', output)
                 if len(reply) > 0:
@@ -415,12 +375,9 @@ class LakeshoreController:
                     if reply in self.htr_errors:
                         retval = self.htr_errors[reply]
                     else:
-                        if self.logger:
-                            self.logger.error(
-                                "Heater error %s and status is unknown", reply)
+                        self.logger.error("Heater error %s and status is unknown", reply)
         else:
-            if self.logger:
-                self.logger.error("Heater is not available with this model")
+            self.logger.error("Heater is not available with this model")
         return retval
 
     def get_heater_output(self, output):
@@ -432,8 +389,7 @@ class LakeshoreController:
         retval = None
         if self.model336:
             if output.upper() not in self.outputs:
-                if self.logger:
-                    self.logger.error("Heater %s is not available", output)
+                self.logger.error("Heater %s is not available", output)
             else:
                 reply = self.command('htr?', output)
                 if len(reply) > 0:
@@ -441,13 +397,26 @@ class LakeshoreController:
                     try:
                         retval = float(reply)
                     except ValueError:
-                        if self.logger:
-                            self.logger.error("Heater output error: %s", reply)
+                        self.logger.error("Heater output error: %s", reply)
                 else:
-                    if self.logger:
-                        self.logger.error("Heater output error")
+                    self.logger.error("Heater output error")
         else:
-            if self.logger:
-                self.logger.error("Heater is not available with this model")
+            self.logger.error("Heater is not available with this model")
+        return retval
+
+    def get_atomic_value(self, item: str = "") -> Union[float, None]:
+        """
+        Read the latest value of a specific item
+        :param item: String, name of the item
+        returns value of item or None
+        """
+        retval = None
+        if item.upper() in self.sensors or item in self.outputs:
+            if item.upper() in self.sensors:
+                retval = self.get_temperature(item)
+            else:
+                retval = self.get_heater_output(item)
+        else:
+            self.logger.error("Item %s is not available", item)
         return retval
 # end of class Controller

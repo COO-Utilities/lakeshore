@@ -10,6 +10,16 @@ Low-level Python modules to send commands to Lakeshore 224 or 336 controllers.
 - Query sensor values
 - For model 336, query status and parameters of heaters
 
+## Requirements
+
+Install base class from https://github.com/COO-Utilities/hardware_device_base
+
+## Installation
+
+```bash
+pip install .
+```
+
 ## Usage
 
 ```python

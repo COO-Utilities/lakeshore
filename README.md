@@ -12,7 +12,7 @@ Low-level Python modules to send commands to Lakeshore 224 or 336 controllers.
 
 ## Requirements
 
-Install base class from https://github.com/COO-Utilities/hardware_device_base
+- Install base class from https://github.com/COO-Utilities/hardware_device_base
 
 ## Installation
 

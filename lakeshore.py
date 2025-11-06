@@ -26,21 +26,28 @@ class LakeshoreController(HardwareDeviceBase):
     htr_errors = {'0': 'no error', '1': 'heater open load', '2': 'heater short'}
 
     def __init__(self, log=True, logfile=__name__.rsplit(".", 1)[-1],
-                 opt3062=False, model336=True):
+                 opt3062=False, model336=True, celsius=True):
         """ Initialize the Lakeshore controller.
         :param log: If True, log to file
         :param logfile: name of log file (defaults to lakeshore.log)
         :param opt3062: set to True if optional 3062 board installed (defaults to False)
         :param model336: set to True if controller is model 336 (default),
                         if False assumes model 224
+        :param celsius: set to True to read temperature in Celsius (default),
         """
-
+        # pylint: disable=too-many-positional-arguments, too-many-arguments
         super().__init__(log, logfile)
         self.socket: socket.socket | None = None
         self.host: str | None = None
         self.port: int = -1
 
-        self.celsius = True
+        self.celsius = celsius
+        if self.celsius:
+            self.set_celsius()
+            self.logger.info("Using Celsius for temperature")
+        else:
+            self.set_kelvin()
+            self.logger.info("Using Kelvin for temperature")
         self.model336 = model336
 
         self.status = None
@@ -165,7 +172,7 @@ class LakeshoreController(HardwareDeviceBase):
         if current != 'locked' or status == 'unlocked':
             self.status = status
 
-    def initialize(self, celsius=True):
+    def initialize(self):
         """ Initialize the lakeshore status. """
 
         self.revision = self.command('*idn?')
@@ -194,11 +201,6 @@ class LakeshoreController(HardwareDeviceBase):
                     self.outputs[htr]['p'] = p
                     self.outputs[htr]['i'] = i
                     self.outputs[htr]['d'] = d
-
-        if celsius:
-            self.set_celsius()
-        else:
-            self.set_kelvin()
 
         self.initialized = True
 

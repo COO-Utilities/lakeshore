@@ -89,8 +89,7 @@ class LakeshoreController(HardwareSensorBase):
             self.report_error(f"Disconnection error: {e.strerror}")
             self._set_connected(False)
             self.socket = None
-
-        self.set_status("disconnected")
+        self.report_info("Disconnected from controller")
 
     def connect(self, host, port, con_type: str ="tcp") -> None: # pylint: disable=W0221
         """ Connect to controller. """
@@ -136,22 +135,6 @@ class LakeshoreController(HardwareSensorBase):
                     break
             self.socket.setblocking(True)
 
-    def set_status(self, status):
-        """ Set the status of the filter wheel.
-
-        :param status: String, status of the controller.
-
-        """
-        status = status.lower()
-
-        if self.status is None:
-            current = None
-        else:
-            current = self.status
-
-        if current != 'locked' or status == 'unlocked':
-            self.status = status
-
     def initialize(self):
         """ Initialize the lakeshore status. """
 
@@ -185,7 +168,7 @@ class LakeshoreController(HardwareSensorBase):
         self.initialized = True
 
     def command(self, command, params=None):
-        """ Wrapper to issue_command(), ensuring the command lock is
+        """ Wrapper to _send_command(), ensuring the command lock is
             released if an exception occurs.
 
         :param command: String, command to issue.
@@ -218,7 +201,7 @@ class LakeshoreController(HardwareSensorBase):
 
         """
         if not self.is_connected():
-            self.set_status('connecting')
+            self.report_info('connecting')
             self.connect(self.host, self.port)
 
         retries = 3

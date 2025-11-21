@@ -6,7 +6,7 @@ import socket
 import time
 from typing import Union
 
-from hardware_device_base.hardware_sensor_base import HardwareSensorBase
+from hardware_device_base import HardwareSensorBase
 
 
 class LakeshoreController(HardwareSensorBase):

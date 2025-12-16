@@ -14,7 +14,6 @@ class LakeshoreController(HardwareSensorBase):
         Lakeshore 224/336 controller.
     """
     # pylint: disable=too-many-instance-attributes
-    initialized = False
     revision = None
     termchars = '\r\n'
 

@@ -78,7 +78,7 @@ class LakeshoreController(HardwareSensorBase):
             self.report_warning("Already disconnected from device")
             return
         try:
-            self.logger.info("Disconnecting from device")
+            self.report_info("Disconnecting from device")
             self.socket.shutdown(socket.SHUT_RDWR)
             self.socket.close()
             self.socket = None
@@ -189,7 +189,7 @@ class LakeshoreController(HardwareSensorBase):
                 self.report_error(f"Error sending command '{command}'")
                 raise IOError(f"Failed to write command: '{ex}'") from ex
                 # Ensure that status is always checked, even on failure
-            self.logger.debug("Command sent to lakeshore")
+            self.report_debug("Command sent to lakeshore")
 
         return result
 
@@ -211,7 +211,7 @@ class LakeshoreController(HardwareSensorBase):
             send_command = f"{command}{self.termchars}".encode('utf-8')
 
         while retries > 0:
-            self.logger.debug("sending command %s", send_command)
+            self.report_debug(f"sending command {send_command}")
             try:
                 self.socket.send(send_command)
 
@@ -232,7 +232,7 @@ class LakeshoreController(HardwareSensorBase):
             self.report_error("Failed to send command.")
             raise RuntimeError('unable to successfully issue command: ' + repr(command))
 
-        self.logger.debug("Sent command: %s", send_command)
+        self.report_debug(f"Sent command: {send_command}")
         self._set_status((0, f"Command sent to lakeshore: {command}"))
         return True
 
@@ -245,7 +245,7 @@ class LakeshoreController(HardwareSensorBase):
                 time.time() - start < timeout:
             try:
                 reply += self.socket.recv(1024)
-                self.logger.debug("reply: %s", reply)
+                self.report_debug(f"reply: {reply}")
             except OSError as e:
                 if e.errno == ETIMEDOUT:
                     reply = ''

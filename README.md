@@ -6,7 +6,7 @@ Low-level Python modules to send commands to Lakeshore 224 or 336 controllers.
 - 224 & 336 - lakeshore.py
 
 ## Features
-- Connect to Lakeshore controllers over ethernet
+- Connect to Lakeshore controllers over Ethernet
 - Query sensor values
 - For model 336, query status and parameters of heaters
 
@@ -51,5 +51,38 @@ Unit tests are located in `tests/` directory.
 To run all tests from the project root:
 
 ```bash
-pytest
+python -m pytest
+```
+
+## Class Diagram
+
+Below is a class diagram of the added methods and attributes for the lakeshore.
+See the README for the hardware_device_base module for the inherited methods and
+attributes.
+
+```mermaid
+classDiagram
+    class LakeshoreController {
+        +Str revision
+        +Str termchars
+        +Dict[str, int] resistance
+        +Dict[str, float] max_current
+        +Dict[str, str] htr_display
+        +Dict[str, str] htr_errors
+        +socket socket
+        +Str host
+        +Int port
+        +Bool celsius
+        +Dict[str, int] sensors
+        +Dict[str, Dict[str, Union[str, int, float]]] outputs
+        _clear_socket()
+        command() str
+        set_celsius()
+        set_kelvin()
+        get_temperature() float
+        get_heater_settings() Union[Tuple[float, float, float, float], None]
+        get_heater_pid() Union[Tuple[float, float, float], None]
+        get_heater_status() str
+        get_heater_output() Union[float, None]
+    }
 ```

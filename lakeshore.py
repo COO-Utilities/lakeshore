@@ -4,7 +4,7 @@
 from errno import ETIMEDOUT, EISCONN
 import socket
 import time
-from typing import Union
+from typing import Union, Tuple
 
 from hardware_device_base import HardwareSensorBase
 
@@ -166,7 +166,7 @@ class LakeshoreController(HardwareSensorBase):
 
         self.initialized = True
 
-    def command(self, command, params=None):
+    def command(self, command, params=None) -> str:
         """ Wrapper to _send_command(), ensuring the command lock is
             released if an exception occurs.
 
@@ -269,7 +269,7 @@ class LakeshoreController(HardwareSensorBase):
         """ Set units to Kelvin. """
         self.celsius = False
 
-    def get_temperature(self, sensor):
+    def get_temperature(self, sensor) -> Union[float, None]:
         """ Get sensor temperature.
 
         :param sensor: String, name of the sensor: A-D or A-C, D1=D5.
@@ -289,7 +289,7 @@ class LakeshoreController(HardwareSensorBase):
                     retval = float(reply)
         return retval
 
-    def get_heater_settings(self, output):
+    def get_heater_settings(self, output) -> Union[Tuple[float, float, float, float], None]:
         """ Get heater settings.
 
         :param output: String, output number of the sensor (1 or 2).
@@ -309,7 +309,7 @@ class LakeshoreController(HardwareSensorBase):
             self.report_error("Heater is not available with this model")
         return retval
 
-    def get_heater_pid(self, output):
+    def get_heater_pid(self, output) -> Union[Tuple[float, float, float], None]:
         """ Get heater PID values.
 
         :param output: String, output number of the sensor (1 or 2).
@@ -328,7 +328,7 @@ class LakeshoreController(HardwareSensorBase):
             self.report_error("Heater is not available with this model")
         return retval
 
-    def get_heater_status(self, output):
+    def get_heater_status(self, output) -> str:
         """ Get heater status.
 
         :param output: String, output number of the sensor (1 or 2).
@@ -350,7 +350,7 @@ class LakeshoreController(HardwareSensorBase):
             self.report_error("Heater is not available with this model")
         return retval
 
-    def get_heater_output(self, output):
+    def get_heater_output(self, output) -> Union[float, None]:
         """ Get heater output.
 
         :param output: String, output number of the sensor (1 or 2).

@@ -139,6 +139,10 @@ class LakeshoreController(HardwareSensorBase):
     def initialize(self):
         """ Initialize the lakeshore status. """
 
+        if not self.is_connected():
+            self.report_error("Not connected to lakeshore")
+            return
+
         self.revision = self.command('*idn?')
 
         if self.model336:
@@ -194,9 +198,11 @@ class LakeshoreController(HardwareSensorBase):
                 # Ensure that status is always checked, even on failure
             self.report_debug("Command sent to lakeshore")
 
+        if not result:
+            result = 'ERROR'
         return result
 
-    def _send_command(self, command: str, *args) -> bool:  # pylint: disable=W0221
+    def _send_command(self, command: str, args) -> bool:  # pylint: disable=W0221
         """ Wrapper to send/receive with error checking and retries.
 
         :param command: String, command to issue.
@@ -296,7 +302,7 @@ class LakeshoreController(HardwareSensorBase):
                     retval = float(reply)
         return retval
 
-    def get_heater_settings(self, output) -> Union[Tuple[float, float, float, float], None]:
+    def get_heater_settings(self, output) -> Union[Tuple[int, float, float, str], None]:
         """ Get heater settings.
 
         :param output: String, output number of the sensor (1 or 2).
@@ -346,7 +352,7 @@ class LakeshoreController(HardwareSensorBase):
             if output.upper() not in self.outputs:
                 self.report_error(f"Heater {output} is not available")
             else:
-                reply = self.command('setp', [output, f"{setpoint}"])
+                reply = self.command('setp', (output, f"{setpoint}"))
                 if 'OK' in reply:
                     retval = True
                     self.outputs[output]['setpoint'] = setpoint
@@ -368,7 +374,7 @@ class LakeshoreController(HardwareSensorBase):
                 reply = self.command('pid?', output)
                 if len(reply) > 0:
                     p, i, d = reply.split(',')
-                    retval = [float(p), float(i), float(d)]
+                    retval = (float(p), float(i), float(d))
         else:
             self.report_error("Heater is not available with this model")
         return retval

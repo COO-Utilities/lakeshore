@@ -58,11 +58,13 @@ class LakeshoreController(HardwareSensorBase):
             self.outputs = {'1':
                                 {'resistance': None, 'max_current': 0.0,
                                  'user_max_current': 0.0, 'htr_display': '',
-                                 'status': '', 'p': 0.0, 'i': 0.0, 'd': 0.0},
+                                 'status': '', 'setpoint': 0.0,
+                                 'p': 0.0, 'i': 0.0, 'd': 0.0},
                             '2':
                                 {'resistance': None, 'max_current': 0.0,
                                  'user_max_current': 0.0, 'htr_display': '',
-                                 'status': '', 'p': 0.0, 'i': 0.0, 'd': 0.0},
+                                 'status': '', 'setpoint': 0.0,
+                                 'p': 0.0, 'i': 0.0, 'd': 0.0},
             }
         else:
             # Model 224
@@ -134,8 +136,25 @@ class LakeshoreController(HardwareSensorBase):
                     break
             self.socket.setblocking(True)
 
+    def _check_heater(self, htr) -> str | None:
+        """ Check if heater option is present and if htr exists. """
+        if not self.model336 or self.outputs is None:
+            self.report_error("Heater option not available with this model")
+            return None
+        key = str(htr)
+
+        if key not in self.outputs:
+            self.report_error(f"Heater {htr} is not available")
+            return None
+
+        return key
+
     def initialize(self):
         """ Initialize the lakeshore status. """
+
+        if not self.is_connected():
+            self.report_error("Not connected to lakeshore")
+            return
 
         self.revision = self.command('*idn?')
 
@@ -154,6 +173,7 @@ class LakeshoreController(HardwareSensorBase):
                     self.outputs[htr]['htr_display'] = htr_display
 
                 self.outputs[htr]['status'] = self.get_heater_status(htr)
+                self.outputs[htr]['setpoint'] = self.get_heater_setpoint(htr)
 
                 pid = self.get_heater_pid(htr)
                 if pid is None:
@@ -178,11 +198,12 @@ class LakeshoreController(HardwareSensorBase):
         with self.lock:
             try:
                 if self._send_command(command, params):
-                    result = ''
                     if '?' in command:
                         result = self._read_reply()
+                    else:
+                        result = 'OK'
                 else:
-                    result = ''
+                    result = 'ERROR'
                     self.report_error(f"Error sending command '{command}'")
             except Exception as ex:
                 self.report_error(f"Error sending command '{command}'")
@@ -190,9 +211,11 @@ class LakeshoreController(HardwareSensorBase):
                 # Ensure that status is always checked, even on failure
             self.report_debug("Command sent to lakeshore")
 
+        if not result:
+            result = 'ERROR'
         return result
 
-    def _send_command(self, command: str, *args) -> bool:  # pylint: disable=W0221
+    def _send_command(self, command: str, args) -> bool:  # pylint: disable=W0221
         """ Wrapper to send/receive with error checking and retries.
 
         :param command: String, command to issue.
@@ -205,7 +228,10 @@ class LakeshoreController(HardwareSensorBase):
 
         retries = 3
         if args:
-            send_command = f"{command} {args[0]}{self.termchars}".encode('utf-8')
+            if len(args) == 1:
+                send_command = f"{command} {args[0]}{self.termchars}".encode('utf-8')
+            else:
+                send_command = f"{command} {','.join(args)}{self.termchars}".encode('utf-8')
         else:
             send_command = f"{command}{self.termchars}".encode('utf-8')
 
@@ -289,24 +315,62 @@ class LakeshoreController(HardwareSensorBase):
                     retval = float(reply)
         return retval
 
-    def get_heater_settings(self, output) -> Union[Tuple[float, float, float, float], None]:
+    def get_heater_settings(self, output) -> Union[Tuple[int, float, float, str], None]:
         """ Get heater settings.
 
         :param output: String, output number of the sensor (1 or 2).
         returns resistance, max current, max user current, display.
         """
+        key = self._check_heater(output)
+        if key is None:
+            return None
+
         retval = None
-        if self.model336:
-            if output.upper() not in self.outputs:
-                self.report_error(f"Heater {output} is not available")
-            else:
-                reply = self.command('htrset?', output)
-                if len(reply) > 0:
-                    ires, imaxcur, strusermaxcur, idisp = reply.split(',')
-                    retval = (self.resistance[ires], self.max_current[imaxcur],
-                              float(strusermaxcur), self.htr_display[idisp])
+        reply = self.command('htrset?', key)
+        if len(reply) > 0:
+            ires, imaxcur, strusermaxcur, idisp = reply.split(',')
+            retval = (self.resistance[ires], self.max_current[imaxcur],
+                      float(strusermaxcur), self.htr_display[idisp])
         else:
-            self.report_error("Heater is not available with this model")
+            self.report_error("Unable to retrieve heater settings")
+        return retval
+
+    def get_heater_setpoint(self, output) -> Union[float, None]:
+        """ Get heater settings.
+
+        :param output: String, output number of the sensor (1 or 2).
+        returns setpoint for heater.
+        """
+        key = self._check_heater(output)
+        if key is None:
+            return None
+
+        reply = self.command('setp?', key)
+        if len(reply) > 0:
+            retval = float(reply)
+        else:
+            self.report_error("Unable to retrieve setpoint")
+            retval = None
+        return retval
+
+    def set_heater_setpoint(self, output, setpoint: float = 0.0) -> bool:
+        """ Get heater settings.
+
+        :param output: String, output number of the sensor (1 or 2).
+        :param setpoint: Float, setpoint for heater.
+        returns True if set successfully, False otherwise.
+        """
+        key = self._check_heater(output)
+        if key is None:
+            return False
+
+        reply = self.command('setp', (key, f"{setpoint}"))
+        if 'OK' in reply:
+            retval = True
+            self.outputs[output]['setpoint'] = setpoint
+        else:
+            self.report_error("Unable to set setpoint")
+            retval = False
         return retval
 
     def get_heater_pid(self, output) -> Union[Tuple[float, float, float], None]:
@@ -315,17 +379,17 @@ class LakeshoreController(HardwareSensorBase):
         :param output: String, output number of the sensor (1 or 2).
         returns p,i,d values
         """
+        key = self._check_heater(output)
+        if key is None:
+            return None
+
         retval = None
-        if self.model336:
-            if output.upper() not in self.outputs:
-                self.report_error(f"Heater {output} is not available")
-            else:
-                reply = self.command('pid?', output)
-                if len(reply) > 0:
-                    p, i, d = reply.split(',')
-                    retval = [float(i), float(d), float(p)]
+        reply = self.command('pid?', key)
+        if len(reply) > 0:
+            p, i, d = reply.split(',')
+            retval = (float(p), float(i), float(d))
         else:
-            self.report_error("Heater is not available with this model")
+            self.report_error("Unable to retrieve pid values")
         return retval
 
     def get_heater_status(self, output) -> str:
@@ -334,18 +398,18 @@ class LakeshoreController(HardwareSensorBase):
         :param output: String, output number of the sensor (1 or 2).
         returns status string
         """
+        key = self._check_heater(output)
+        if key is None:
+            return 'unknown'
+
         retval = 'unknown'
-        if self.model336:
-            if output.upper() not in self.outputs:
-                self.report_error(f"Heater {output} is not available")
+        reply = self.command('htrst?', key)
+        if len(reply) > 0:
+            reply = reply.strip()
+            if reply in self.htr_errors:
+                retval = self.htr_errors[reply]
             else:
-                reply = self.command('htrst?', output)
-                if len(reply) > 0:
-                    reply = reply.strip()
-                    if reply in self.htr_errors:
-                        retval = self.htr_errors[reply]
-                    else:
-                        self.report_error(f"Heater error {reply} and status is unknown")
+                self.report_error(f"Heater error {reply} and status is unknown")
         else:
             self.report_error("Heater is not available with this model")
         return retval
@@ -356,22 +420,20 @@ class LakeshoreController(HardwareSensorBase):
         :param output: String, output number of the sensor (1 or 2).
         returns heater output.
         """
+        key = self._check_heater(output)
+        if key is None:
+            return None
+
         retval = None
-        if self.model336:
-            if output.upper() not in self.outputs:
-                self.report_error(f"Heater {output} is not available")
-            else:
-                reply = self.command('htr?', output)
-                if len(reply) > 0:
-                    reply = reply.strip()
-                    try:
-                        retval = float(reply)
-                    except ValueError:
-                        self.report_error(f"Heater output error: {reply}")
-                else:
-                    self.report_error("Heater output error")
+        reply = self.command('htr?', key)
+        if len(reply) > 0:
+            reply = reply.strip()
+            try:
+                retval = float(reply)
+            except ValueError:
+                self.report_error(f"Heater output error: {reply}")
         else:
-            self.report_error("Heater is not available with this model")
+            self.report_error("Heater output error")
         return retval
 
     def get_atomic_value(self, item: str = "") -> Union[float, None]:

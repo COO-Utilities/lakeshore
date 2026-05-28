@@ -544,6 +544,16 @@ class LakeshoreController(HardwareSensorBase):
         returns value of item or None
         """
         retval = None
+        if 'help' in item.lower():
+            print("Legal items:")
+            for sen in self.sensors:
+                print(sen)
+            if self.outputs is not None:
+                for htr in self.outputs:
+                    print(htr)
+                print("setpoint1\nsetpoint2")
+            return retval
+
         if item.upper() in self.sensors or item in self.outputs:
             if item.upper() in self.sensors:
                 retval = self.get_temperature(item)

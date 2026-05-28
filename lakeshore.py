@@ -151,6 +151,7 @@ class LakeshoreController(HardwareSensorBase):
 
         return key
 
+    # pylint: disable=too-many-locals
     def initialize(self):
         """ Initialize the lakeshore status. """
 

@@ -352,8 +352,8 @@ class LakeshoreController(HardwareSensorBase):
         """ Get heater mode.
 
         :param output: String, output number of the sensor (1 or 2).
-        returns mode (0 - off,
-                      1 - closed loop PID,
+        returns mode (0 - Off,
+                      1 - Closed loop PID,
                       2 - Zone,
                       3 - Open loop,
                       4 - Monitor Out,
@@ -380,13 +380,13 @@ class LakeshoreController(HardwareSensorBase):
         """ Set heater mode.
 
         :param output: String, output number of the sensor (1 or 2).
-        :param mode: Integer, (0 - off,
-                      1 - closed loop PID,
-                      2 - Zone,
-                      3 - Open loop,
-                      4 - Monitor Out,
-                      5 - Warmup Supply
-                      6 - Mirroring)
+        :param mode: Integer, (0 - Off,
+                               1 - Closed loop PID,
+                               2 - Zone,
+                               3 - Open loop,
+                               4 - Monitor Out,
+                               5 - Warmup Supply
+                               6 - Mirroring)
         :param sinput: Integer, 0 - None, 1 - A, 2 - B, 3 - C, 4 - D
                 for 3062 opt 5 - D2, 6 - D3, 7 - D4, 8 - D5
         :param powerup: Integer, 0 - powerup enable off, 1 - powerup enable on
@@ -549,6 +549,9 @@ class LakeshoreController(HardwareSensorBase):
                 retval = self.get_temperature(item)
             else:
                 retval = self.get_heater_output(item)
+        elif 'setpoint' in item:
+            htr = item[-1:]
+            retval = self.get_heater_setpoint(htr)
         else:
             self.report_error(f"Item {item} is not available")
         return retval

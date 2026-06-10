@@ -244,7 +244,7 @@ class LakeshoreController(HardwareSensorBase):
             if isinstance(args, list):
                 send_command = f"{command} {','.join(args)}{self.termchars}".encode('utf-8')
             elif isinstance(args, str):
-                send_command = f"{command} {args[0]}{self.termchars}".encode('utf-8')
+                send_command = f"{command} {args}{self.termchars}".encode('utf-8')
             else:
                 self.report_error(
                     f"Invalid arguments for command '{command}', must be list or string")

@@ -59,11 +59,13 @@ class LakeshoreController(HardwareSensorBase):
                                 {'resistance': None, 'max_current': 0.0,
                                  'user_max_current': 0.0, 'htr_display': '',
                                  'status': '', 'setpoint': 0.0,
+                                 'mode': 0, 'input': 0, 'powerup': 0,
                                  'p': 0.0, 'i': 0.0, 'd': 0.0},
                             '2':
                                 {'resistance': None, 'max_current': 0.0,
                                  'user_max_current': 0.0, 'htr_display': '',
                                  'status': '', 'setpoint': 0.0,
+                                 'mode': 0, 'input': 0, 'powerup': 0,
                                  'p': 0.0, 'i': 0.0, 'd': 0.0},
             }
         else:
@@ -149,6 +151,7 @@ class LakeshoreController(HardwareSensorBase):
 
         return key
 
+    # pylint: disable=too-many-locals
     def initialize(self):
         """ Initialize the lakeshore status. """
 
@@ -162,6 +165,7 @@ class LakeshoreController(HardwareSensorBase):
 
             for htr_items in self.outputs.items():
                 htr = htr_items[0]
+
                 htr_settings = self.get_heater_settings(htr)
                 if htr_settings is None:
                     self.report_warning(f"Unable to get settings for htr {htr}")
@@ -174,6 +178,15 @@ class LakeshoreController(HardwareSensorBase):
 
                 self.outputs[htr]['status'] = self.get_heater_status(htr)
                 self.outputs[htr]['setpoint'] = self.get_heater_setpoint(htr)
+
+                htr_mode = self.get_heater_mode(htr)
+                if htr_mode is None:
+                    self.report_warning(f"Unable to get mode for htr {htr}")
+                else:
+                    mode, sinput, powerup = htr_mode
+                    self.outputs[htr]['mode'] = mode
+                    self.outputs[htr]['input'] = sinput
+                    self.outputs[htr]['powerup'] = powerup
 
                 pid = self.get_heater_pid(htr)
                 if pid is None:
@@ -228,10 +241,20 @@ class LakeshoreController(HardwareSensorBase):
 
         retries = 3
         if args:
-            if len(args) == 1:
-                send_command = f"{command} {args[0]}{self.termchars}".encode('utf-8')
+            if isinstance(args, list):
+                if all(isinstance(arg, str) for arg in args):
+                    send_command = f"{command} {','.join(args)}{self.termchars}".encode('utf-8')
+                else:
+                    self.report_error(
+                        f"Arguments for command '{command}' must be a list of strings")
+                    return False
+            elif isinstance(args, str):
+                send_command = f"{command} {args}{self.termchars}".encode('utf-8')
             else:
-                send_command = f"{command} {','.join(args)}{self.termchars}".encode('utf-8')
+                self.report_error(
+                    f"Arguments for command '{command}', must be a list of strings or a string")
+                return False
+
         else:
             send_command = f"{command}{self.termchars}".encode('utf-8')
 
@@ -335,6 +358,65 @@ class LakeshoreController(HardwareSensorBase):
             self.report_error("Unable to retrieve heater settings")
         return retval
 
+    def get_heater_mode(self, output) -> Union[Tuple[int, int, int], None]:
+        """ Get heater mode.
+
+        :param output: String, output number of the sensor (1 or 2).
+        returns mode (0 - Off,
+                      1 - Closed loop PID,
+                      2 - Zone,
+                      3 - Open loop,
+                      4 - Monitor Out,
+                      5 - Warmup Supply
+                      6 - Mirroring),
+                input/output (0 - None, 1 - A, 2 - B, 3 - C, 4 - D
+                    for 3062 opt (5 - D2, 6 - D3, 7 - D4, 8 - D5),
+                powerup (0 - powerup enable off, 1 - powerup enable on)
+        """
+        key = self._check_heater(output)
+        if key is None:
+            return None
+
+        retval = None
+        reply = self.command('outmode?', key)
+        if len(reply) > 0:
+            mode, sinput, powerup = reply.split(',')
+            retval = (int(mode), int(sinput), int(powerup))
+        else:
+            self.report_error("Unable to retrieve heater mode")
+        return retval
+
+    def set_heater_mode(self, output, mode: int = 0, sinput: int = 0, powerup: int = 0) -> bool:
+        """ Set heater mode.
+
+        :param output: String, output number of the sensor (1 or 2).
+        :param mode: Integer, (0 - Off,
+                               1 - Closed loop PID,
+                               2 - Zone,
+                               3 - Open loop,
+                               4 - Monitor Out,
+                               5 - Warmup Supply
+                               6 - Mirroring)
+        :param sinput: Integer, 0 - None, 1 - A, 2 - B, 3 - C, 4 - D
+                for 3062 opt 5 - D2, 6 - D3, 7 - D4, 8 - D5
+        :param powerup: Integer, 0 - powerup enable off, 1 - powerup enable on
+        returns True if set successfully, False otherwise.
+        """
+        key = self._check_heater(output)
+        if key is None:
+            return False
+
+        reply = self.command('outmode', (key, f"{mode}", f"{sinput}", f"{powerup}"))
+        if 'OK' in reply:
+            self.outputs[key]['mode'] = mode
+            self.outputs[key]['input'] = sinput
+            self.outputs[key]['powerup'] = powerup
+            retval = True
+        else:
+            self.report_error("Unable to set heater mode")
+            retval = False
+        return retval
+
     def get_heater_setpoint(self, output) -> Union[float, None]:
         """ Get heater settings.
 
@@ -354,7 +436,7 @@ class LakeshoreController(HardwareSensorBase):
         return retval
 
     def set_heater_setpoint(self, output, setpoint: float = 0.0) -> bool:
-        """ Get heater settings.
+        """ Set heater setpoint.
 
         :param output: String, output number of the sensor (1 or 2).
         :param setpoint: Float, setpoint for heater.
@@ -390,6 +472,35 @@ class LakeshoreController(HardwareSensorBase):
             retval = (float(p), float(i), float(d))
         else:
             self.report_error("Unable to retrieve pid values")
+        return retval
+
+    def set_heater_pid(self, output, pval: float = -1.0, ival: float = -1.0,
+                       dval: float = -1.0) -> bool:
+        """ Set heater PID values.
+
+        :param output: String, output number of the sensor (1 or 2).
+        :param pval: Float, output proportional.
+        :param ival: Float, output integral.
+        :param dval: Float, output derivative.
+        returns True if set successfully, False otherwise.
+        """
+        key = self._check_heater(output)
+        if key is None:
+            return False
+
+        if 0.1 <= pval <= 1000.0 and 0.1 <= ival <= 1000.0 and 0.0 <= dval <= 200.0:
+            reply = self.command('pid', (key, f"{pval}", f"{ival}", f"{dval}"))
+            if 'OK' in reply:
+                retval = True
+                self.outputs[key]['p'] = pval
+                self.outputs[key]['i'] = ival
+                self.outputs[key]['d'] = dval
+            else:
+                self.report_error("Unable to set PID values")
+                retval = False
+        else:
+            self.report_error("PID values out of range (pi: 0.1-1000.0, d: 0.0-200.0")
+            retval = False
         return retval
 
     def get_heater_status(self, output) -> str:
@@ -443,11 +554,24 @@ class LakeshoreController(HardwareSensorBase):
         returns value of item or None
         """
         retval = None
+        if 'help' in item.lower():
+            print("Legal items:")
+            for sen in self.sensors:
+                print(sen)
+            if self.outputs is not None:
+                for htr in self.outputs:
+                    print(htr)
+                print("setpoint1\nsetpoint2")
+            return retval
+
         if item.upper() in self.sensors or item in self.outputs:
             if item.upper() in self.sensors:
                 retval = self.get_temperature(item)
             else:
                 retval = self.get_heater_output(item)
+        elif 'setpoint' in item:
+            htr = item[-1:]
+            retval = self.get_heater_setpoint(htr)
         else:
             self.report_error(f"Item {item} is not available")
         return retval

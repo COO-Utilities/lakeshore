@@ -321,7 +321,7 @@ class LakeshoreController(HardwareSensorBase):
     def get_temperature(self, sensor) -> Union[float, None]:
         """ Get sensor temperature.
 
-        :param sensor: String, name of the sensor: A-D or A-C, D1=D5.
+        :param sensor: String, name of the sensor: A-D or A-C, D1-D5.
 
         """
         retval = None
@@ -370,8 +370,8 @@ class LakeshoreController(HardwareSensorBase):
                       5 - Warmup Supply
                       6 - Mirroring),
                 input/output (0 - None, 1 - A, 2 - B, 3 - C, 4 - D
-                    for 3062 opt (5 - D2, 6 - D3, 7 - D4, 8 - D5),
-                powerup (0 - powerup enable off, 1 - powerup enable on)
+                    for 3062 opt 4 - D1, 5 - D2, 6 - D3, 7 - D4, 8 - D5
+                powerup: Integer, 0 - powerup enable off, 1 - powerup enable on
         """
         key = self._check_heater(output)
         if key is None:
@@ -398,7 +398,7 @@ class LakeshoreController(HardwareSensorBase):
                                5 - Warmup Supply
                                6 - Mirroring)
         :param sinput: Integer, 0 - None, 1 - A, 2 - B, 3 - C, 4 - D
-                for 3062 opt 5 - D2, 6 - D3, 7 - D4, 8 - D5
+                for 3062 opt 4 - D1, 5 - D2, 6 - D3, 7 - D4, 8 - D5
         :param powerup: Integer, 0 - powerup enable off, 1 - powerup enable on
         returns True if set successfully, False otherwise.
         """
